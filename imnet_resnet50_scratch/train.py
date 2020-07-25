@@ -85,13 +85,15 @@ class Trainer:
         return empty_trainer
 
     def _setup_process_group(self) -> None:
-        torch.cuda.set_device(self._train_cfg.local_rank)
-        torch.distributed.init_process_group(
-            backend=self._cluster_cfg.dist_backend,
-            init_method=self._cluster_cfg.dist_url,
-            world_size=self._train_cfg.num_tasks,
-            rank=self._train_cfg.global_rank,
-        )
+        # torch.cuda.set_device(self._train_cfg.local_rank)
+        # torch.distributed.init_process_group(
+        #     backend=self._cluster_cfg.dist_backend,
+        #     init_method=self._cluster_cfg.dist_url,
+        #     world_size=self._train_cfg.num_tasks,
+        #     rank=self._train_cfg.global_rank,
+        # )
+        torch.device('cpu')
+
         print(f"Process group: {self._train_cfg.num_tasks} tasks, rank: {self._train_cfg.global_rank}")
 
     def _init_state(self) -> None:
@@ -133,11 +135,13 @@ class Trainer:
 
         print("Create distributed model", flush=True)
         model = models.resnet50(pretrained=False)
-        
-        model.cuda(self._train_cfg.local_rank)
-        model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[self._train_cfg.local_rank], output_device=self._train_cfg.local_rank
-        )
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        model.to(device)
+
+        # model.cuda(self._train_cfg.local_rank)
+        # model = torch.nn.parallel.DistributedDataParallel(
+        #     model, device_ids=[self._train_cfg.local_rank], output_device=self._train_cfg.local_rank
+        # )
         linear_scaled_lr = 8.0 * self._train_cfg.lr * self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks /512.0
         optimizer = optim.SGD(model.parameters(), lr=linear_scaled_lr, momentum=0.9,weight_decay=1e-4)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30)
@@ -150,6 +154,7 @@ class Trainer:
             self._state = TrainerState.load(checkpoint_fn, default=self._state)
 
     def _train(self) -> Optional[float]:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         criterion = nn.CrossEntropyLoss()
         print_freq = 10
         acc = None
@@ -165,8 +170,11 @@ class Trainer:
             count=0
             for i, data in enumerate(self._train_loader):
                 inputs, labels = data
-                inputs = inputs.cuda(self._train_cfg.local_rank, non_blocking=True)
-                labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
+                # inputs = inputs.cuda(self._train_cfg.local_rank, non_blocking=True)
+                # labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
+
+                inputs = inputs.to(device)
+                labels = labels.to(device)
 
                 outputs = self._state.model(inputs)
                 loss = criterion(outputs, labels)
@@ -194,8 +202,12 @@ class Trainer:
                 with torch.no_grad():
                     for data in self._test_loader:
                         images, labels = data
-                        images = images.cuda(self._train_cfg.local_rank, non_blocking=True)
-                        labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
+                        # images = images.cuda(self._train_cfg.local_rank, non_blocking=True)
+                        # labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
+
+                        images = images.to(device)
+                        labels = labels.to(device)
+
                         outputs = self._state.model(images)
                         loss_val = criterion(outputs, labels)
                         _, predicted = torch.max(outputs.data, 1)

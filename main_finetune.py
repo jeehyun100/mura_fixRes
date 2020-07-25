@@ -65,19 +65,19 @@ def run(input_sizes,epochs,learning_rate,batch,imnet_path,architecture,resnet_we
 if __name__ == "__main__":
     parser = ArgumentParser(description="Fine-tune script for FixRes models",formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('--learning-rate', default=1e-3, type=float, help='base learning rate')
-    parser.add_argument('--epochs', default=1, type=int, help='epochs')
+    parser.add_argument('--epochs', default=10, type=int, help='epochs')
     parser.add_argument('--input-size', default=320, type=int, help='images input size')
     parser.add_argument('--batch', default=8, type=int, help='Batch by GPU')
-    parser.add_argument('--imnet-path', default='/the/imagenet/path', type=str, help='Image Net dataset path')
-    parser.add_argument('--architecture', default='IGAM_Resnext101_32x48d', type=str,choices=['ResNet50', 'PNASNet' , 'IGAM_Resnext101_32x48d'], help='Neural network architecture')
-    parser.add_argument('--resnet-weight-path', default='/where/are/the/weigths.pth', type=str, help='Neural network weights (only for ResNet50)')
+    parser.add_argument('--imnet-path', default='./datasets/mura_finetune_elbow/', type=str, help='Image Net dataset path')
+    parser.add_argument('--architecture', default='ResNet50', type=str,choices=['ResNet50', 'PNASNet' , 'IGAM_Resnext101_32x48d'], help='Neural network architecture')
+    parser.add_argument('--resnet-weight-path', default='./models/ResNetFinetune.pth', type=str, help='Neural network weights (only for ResNet50)')
     parser.add_argument('--workers', default=10, type=int, help='Numbers of CPUs')
     parser.add_argument('--job-id', default='0', type=str, help='id of the execution')
     parser.add_argument('--local-rank', default=0, type=int, help='GPU: Local rank')
     parser.add_argument('--global-rank', default=0, type=int, help='GPU: glocal rank')
     parser.add_argument('--num-tasks', default=32, type=int, help='How many GPUs are used')
-    parser.add_argument('--shared-folder-path', default='your/shared/folder', type=str, help='Shared Folder')
+    parser.add_argument('--shared-folder-path', default='/Users/yewoo/dev/FixRes/shared_folder', type=str, help='Shared Folder')
 
-
+    #python main_finetune.py --input-size 384 --architecture 'ResNet50' --epochs 56 --batch 64 --num-tasks 8 --learning-rate 1e-3
     args = parser.parse_args()
     run(args.input_size,args.epochs,args.learning_rate,args.batch,args.imnet_path,args.architecture,args.resnet_weight_path,args.workers,args.shared_folder_path,args.job_id,args.local_rank,args.global_rank,args.num_tasks)
