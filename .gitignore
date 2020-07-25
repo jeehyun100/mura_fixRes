@@ -5,6 +5,7 @@ __pycache__/
 *.pth
 # C extensions
 *.so
+*.gz
 # data
 .idea/
 MURA-v1.1/
