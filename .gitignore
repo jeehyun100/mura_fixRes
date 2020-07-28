@@ -8,7 +8,9 @@ __pycache__/
 *.gz
 # data
 .idea/
-MURA-v1.1/
+shared_folder/
+
+출처: https://nota.tistory.com/41 [nota's story]
 datasets/
 # Distribution / packaging
 .Python

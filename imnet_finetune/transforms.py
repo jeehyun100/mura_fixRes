@@ -55,7 +55,7 @@ def get_transforms(input_size=224,test_size=224, kind='full', crop=True, need=('
                 transforms.RandomResizedCrop(input_size),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize(mean, std),
+                #transforms.Normalize(mean, std),
             ])
         elif kind == 'full':
             transformations['train'] = transforms.Compose([
@@ -63,7 +63,7 @@ def get_transforms(input_size=224,test_size=224, kind='full', crop=True, need=('
                 transforms.RandomHorizontalFlip(),
                 transforms.ColorJitter(0.3, 0.3, 0.3),
                 transforms.ToTensor(),            
-                transforms.Normalize(mean, std),
+                #transforms.Normalize(mean, std),
             ])
 
         else:
@@ -74,12 +74,14 @@ def get_transforms(input_size=224,test_size=224, kind='full', crop=True, need=('
                 [Resize(int((256 / 224) * test_size)),  # to maintain same ratio w.r.t. 224 images
                  transforms.CenterCrop(test_size),
                  transforms.ToTensor(),
-                 transforms.Normalize(mean, std)])
+                 #transforms.Normalize(mean, std)
+                ])
         else:
             transformations['val'] = transforms.Compose(
                 [Resize(test_size, largest=True),  # to maintain same ratio w.r.t. 224 images
                  transforms.ToTensor(),
-                 transforms.Normalize(mean, std)])
+                 #transforms.Normalize(mean, std)
+                 ])
     return transformations
 
 transforms_list = ['torch', 'full']

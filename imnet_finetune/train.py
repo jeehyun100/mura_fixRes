@@ -102,6 +102,7 @@ class Trainer:
         """
         Initialize the state and load it from an existing checkpoint if any
         """
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         torch.manual_seed(0)
         np.random.seed(0)
         print("Create data loaders", flush=True)
@@ -146,16 +147,21 @@ class Trainer:
             
         if self._train_cfg.architecture=='ResNet50' :
             model=models.resnet50(pretrained=False)
-            pretrained_dict=torch.load(self._train_cfg.resnet_weight_path,map_location='cpu')['model']
+            num_ftrs = model.fc.in_features
+            model.fc = nn.Linear(num_ftrs, 7)
+            pretrained_dict=torch.load(self._train_cfg.resnet_weight_path,map_location=device)['model']
             model_dict = model.state_dict()
             count=0
             count2=0
             for k in model_dict.keys():
                 count=count+1.0
-                if(('module.'+k) in pretrained_dict.keys()):
+                #if(('module.'+k) in pretrained_dict.keys()):
+                if ((k) in pretrained_dict.keys()):
                     count2=count2+1.0
-                    model_dict[k]=pretrained_dict.get(('module.'+k))
+                    #model_dict[k]=pretrained_dict.get(('module.'+k))
+                    model_dict[k] = pretrained_dict.get((k))
             model.load_state_dict(model_dict)
+            model.fc = nn.Linear(num_ftrs, 2)
             print("load "+str(count2*100/count)+" %")
             
             assert int(count2*100/count)== 100,"model loading error"
@@ -171,11 +177,12 @@ class Trainer:
         else:
             
             for name, child in model.named_children():
-                if 'fc' not in name:
+                #if 'layer4' in name:
+                if 'fc' not in name and 'layer4' not in name and 'layer3' not in name :
                     for name2, params in child.named_parameters():
                         params.requires_grad = False
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
         model.to(device)
         # model.cuda(self._train_cfg.local_rank)
         # model = torch.nn.parallel.DistributedDataParallel(
@@ -262,7 +269,7 @@ class Trainer:
                 # inputs = inputs.cuda(self._train_cfg.local_rank, non_blocking=True)
                 # labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
 
-                images = images.to(device)
+                inputs = inputs.to(device)
                 labels = labels.to(device)
 
                 outputs = self._state.model(inputs)

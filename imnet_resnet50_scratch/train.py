@@ -135,6 +135,9 @@ class Trainer:
 
         print("Create distributed model", flush=True)
         model = models.resnet50(pretrained=False)
+        num_ftrs = model.fc.in_features
+        model.fc = nn.Linear(num_ftrs, 7)
+
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         model.to(device)
 

@@ -1,6 +1,5 @@
 attrs
 numpy
-torch
-torchvision
 Pillow
+requests
 tqdm

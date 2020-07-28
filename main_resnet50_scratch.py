@@ -60,14 +60,14 @@ def run(input_sizes,learning_rate,epochs,batch,node,workers,imnet_path,shared_fo
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Training script for ResNet50 FixRes",formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--learning-rate', default=0.02, type=float, help='base learning rate')
+    parser.add_argument('--learning-rate', default=0.01, type=float, help='base learning rate')
     parser.add_argument('--input-size', default=224, type=int, help='images input size')
-    parser.add_argument('--epochs', default=120, type=int, help='epochs')
+    parser.add_argument('--epochs', default=50, type=int, help='epochs')
     parser.add_argument('--batch', default=64, type=int, help='Batch by GPU')
     parser.add_argument('--node', default=1, type=int, help='GPU nodes')
     parser.add_argument('--workers', default=10, type=int, help='Numbers of CPUs')
-    parser.add_argument('--imnet-path', default='./datasets/mura_finetune_elbow/', type=str, help='ImageNet dataset path')
-    parser.add_argument('--shared-folder-path', default='/Users/yewoo/dev/FixRes/shared_folder', type=str, help='Shared Folder')
+    parser.add_argument('--imnet-path', default='./datasets/mura_cls/', type=str, help='ImageNet dataset path')
+    parser.add_argument('--shared-folder-path', default='/home/data/extra/mura_fixRes/shared_folder', type=str, help='Shared Folder')
     parser.add_argument('--job-id', default='0', type=str, help='id of the execution')
     parser.add_argument('--local-rank', default=0, type=int, help='GPU: Local rank')
     parser.add_argument('--global-rank', default=0, type=int, help='GPU: glocal rank')
