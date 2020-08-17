@@ -3,3 +3,7 @@ numpy
 Pillow
 requests
 tqdm
+#faiss-gpu
+umap-learn
+pynndescent
+record-keeper
