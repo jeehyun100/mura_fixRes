@@ -22,7 +22,9 @@ import timm
 import tqdm
 from sklearn.metrics import cohen_kappa_score
 import csv
-from dataset import MURA_Dataset
+from .dataset import MURA_Dataset
+import cv2
+from matplotlib import pyplot as plt
 
 
 def conv_numpy_tensor(output):
@@ -83,6 +85,8 @@ class Trainer:
         self._setup_process_group()
         self._init_state()
         final_acc = self._train()
+        #self._show()
+        final_acc = 0
         return final_acc
 
     def __eval__(self) -> Optional[float]:
@@ -355,12 +359,20 @@ class Trainer:
         linear_scaled_lr = 8.0 * self._train_cfg.lr * self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks /512.0
         #optimizer = optim.SGD(model.parameters(), lr=linear_scaled_lr, momentum=0.9,weight_decay=1e-4)
 
-        optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=1e-5 )
+        #optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=1e-5 )
+        # optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=0.1)
+        # lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=33)
 
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30000)
+        optimizer = optim.Adam(model.parameters(),  lr=self._train_cfg.lr)
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=33, gamma=0.1)
+
         self._state = TrainerState(
             epoch=0,accuracy=0.0, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler
         )
+
+
+
+
         checkpoint_fn = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id), "checkpoint.pth")
         if os.path.isfile(checkpoint_fn):
             print(f"Load existing checkpoint from {checkpoint_fn}", flush=True)
@@ -382,12 +394,18 @@ class Trainer:
             self._state.epoch = epoch
             running_loss = 0.0
             count=0
+            for param_group in self._state.optimizer.param_groups:
+                print("Current learning rate is: {0:.6f}".format(param_group['lr']))
             for i, data in enumerate(self._train_loader):
                 inputs, labels, _, body_part = data
                 #inputs, labels = data
 
                 # inputs = inputs.cuda(self._train_cfg.local_rank, non_blocking=True)
                 # labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
+                # dst = inputs.cpu().numpy()[0]
+                # cv2.imshow('img', dst)
+                # cv2.waitKey()
+                # cv2.destroyAllWindows()
 
                 inputs = inputs.to(device)
                 labels = labels.to(device)
@@ -403,6 +421,7 @@ class Trainer:
                 count=count+1
                 if i % print_freq == print_freq - 1:
                     print(f"[{epoch:02d}, {i:05d}] loss: {running_loss/print_freq:.3f}", flush=True)
+
                     running_loss = 0.0
                 if count>=5005 * 512 /(self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks):
                     break
@@ -445,6 +464,49 @@ class Trainer:
                 max_accuracy=np.max((max_accuracy,acc))
                 if epoch==self._train_cfg.epochs-1:
                     return acc
+
+    def _show(self) -> Optional[float]:
+        try:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            #criterion = nn.CrossEntropyLoss()
+            #print_freq = 10
+            #acc = None
+            #max_accuracy = 0.0
+            # Start from the loaded epoch
+            start_epoch = self._state.epoch
+            for epoch in range(start_epoch, self._train_cfg.epochs):
+                print(f"Start epoch {epoch}", flush=True)
+                #self._state.model.train()
+                #self._state.lr_scheduler.step(epoch)
+                #self._state.epoch = epoch
+                running_loss = 0.0
+                count = 0
+                for i, data in enumerate(self._train_loader):
+                    inputs, labels, _, body_part = data
+                    # inputs, labels = data
+
+                    # inputs = inputs.cuda(self._train_cfg.local_rank, non_blocking=True)
+                    # labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
+                    #while (True):
+                    dst = inputs.cpu().numpy()[0]
+                    dst = dst.transpose(1, 2, 0)
+                    cv2.cvtColor(dst, cv2.COLOR_BGR2RGB)
+                    #dst = cv2.set
+                    cv2.imshow('img', dst)
+                    # 원본 이미지의 히스토그램
+                    # hist_full = cv2.calcHist([dst], [1], None, [256], [0, 256])
+                    # # red는 원본이미지 히스토그램, blue는 mask적용된 히스토그램
+                    # plt.title('Histogram')
+                    # plt.plot(hist_full, color='r')
+                    # plt.xlim([0, 256])
+                    # plt.show()
+
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        cv2.destroyAllWindows()
+                        #break
+        except Exception as e:
+            print("show Job failed : {0}".format(e))
+
 
 
 

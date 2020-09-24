@@ -44,7 +44,8 @@ class Resize(transforms.Resize):
 
 
 def get_transforms(input_size=224,test_size=224, kind='full', crop=True, need=('train', 'val'), backbone=None):
-    mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+    #mean, std = [0.18, 0.18, 0.18], [0.6, 0.6, 0.6]
+    mean, std = [0.18], [0.6]
     if backbone is not None and backbone in ['pnasnet5large', 'nasnetamobile']:
         mean, std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
 
@@ -54,6 +55,7 @@ def get_transforms(input_size=224,test_size=224, kind='full', crop=True, need=('
             transformations['train'] = transforms.Compose([
                 transforms.RandomResizedCrop(input_size),
                 transforms.RandomHorizontalFlip(),
+                transforms.Grayscale(num_output_channels=1),
                 transforms.ToTensor(),
                 #transforms.Normalize(mean, std),
             ])
@@ -61,7 +63,9 @@ def get_transforms(input_size=224,test_size=224, kind='full', crop=True, need=('
             transformations['train'] = transforms.Compose([
                 transforms.RandomResizedCrop(input_size),
                 transforms.RandomHorizontalFlip(),
-                transforms.ColorJitter(0.3, 0.3, 0.3),
+                #transforms.ColorJitter(0.3, 0.3, 0.3),
+                transforms.ColorJitter(0.3),
+                transforms.Grayscale(num_output_channels=1),
                 transforms.ToTensor(),            
                 #transforms.Normalize(mean, std),
             ])
@@ -73,14 +77,20 @@ def get_transforms(input_size=224,test_size=224, kind='full', crop=True, need=('
             transformations['val'] = transforms.Compose(
                 [Resize(int((256 / 224) * test_size)),  # to maintain same ratio w.r.t. 224 images
                  transforms.CenterCrop(test_size),
+                 transforms.Grayscale(num_output_channels=1),
+                 #transforms.Grayscale(num_output_channels=1),
                  transforms.ToTensor(),
-                 #transforms.Normalize(mean, std)
+
+                 transforms.Normalize(mean, std)
                 ])
         else:
             transformations['val'] = transforms.Compose(
                 [Resize(test_size, largest=True),  # to maintain same ratio w.r.t. 224 images
+                 transforms.Grayscale(num_output_channels=1),
+                 #transforms.Grayscale(num_output_channels=1),
                  transforms.ToTensor(),
-                 #transforms.Normalize(mean, std)
+
+                 transforms.Normalize(mean, std)
                  ])
     return transformations
 

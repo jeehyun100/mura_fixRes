@@ -19,6 +19,7 @@ from .config import TrainerConfig, ClusterConfig
 from .transforms import get_transforms
 from .resnext_wsl import resnext101_32x48d_wsl
 from .pnasnet import pnasnet5large
+from torchvision import transforms
 
 @attr.s(auto_attribs=True)
 class TrainerState:
@@ -117,9 +118,11 @@ class Trainer:
             
         transformation=get_transforms(input_size=self._train_cfg.input_size,test_size=self._train_cfg.input_size, kind='full', crop=True, need=('train', 'val'), backbone=backbone_architecture)
         transform_test = transformation['val']
-        
-        
-        train_set = datasets.ImageFolder(self._train_cfg.imnet_path+ '/train',transform=transform_test)
+
+        # data_transform = transforms.Compose([transforms.Grayscale(num_output_channels=1),
+        #                                      transforms.ToTensor()])
+
+        train_set = datasets.ImageFolder(self._train_cfg.imnet_path+ '/train', transform=transform_test)
         
         train_sampler = torch.utils.data.distributed.DistributedSampler(
             train_set,num_replicas=self._train_cfg.num_tasks, rank=self._train_cfg.global_rank
@@ -161,6 +164,7 @@ class Trainer:
                     #model_dict[k]=pretrained_dict.get(('module.'+k))
                     model_dict[k] = pretrained_dict.get((k))
             model.load_state_dict(model_dict)
+            model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
             model.fc = nn.Linear(num_ftrs, 2)
             print("load "+str(count2*100/count)+" %")
             
@@ -178,12 +182,13 @@ class Trainer:
             
             for name, child in model.named_children():
                 #if 'layer4' in name:
-                if 'fc' not in name and 'layer4' not in name and 'layer3' not in name :
+                if 'fc' not in name and 'layer4' not in name and 'layer3' not in name and 'conv1' not in name  :
                     for name2, params in child.named_parameters():
                         params.requires_grad = False
 
-
         model.to(device)
+        #Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+
         # model.cuda(self._train_cfg.local_rank)
         # model = torch.nn.parallel.DistributedDataParallel(
         #     model, device_ids=[self._train_cfg.local_rank], output_device=self._train_cfg.local_rank
