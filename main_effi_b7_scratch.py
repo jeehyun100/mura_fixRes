@@ -86,7 +86,7 @@ if __name__ == "__main__":
     parser.add_argument('--input-size', default=320, type=int, help='images input size')
     parser.add_argument('--epochs', default=300, type=int, help='epochs')
     parser.add_argument('--batch', default=6, type=int, help='Batch by GPU')
-    parser.add_argument('--node', default='0, 1', type=str, help='GPU nodes')
+    parser.add_argument('--gpu_node', default='0, 1', type=str, help='GPU nodes')
     parser.add_argument('--workers', default=1, type=int, help='Numbers of CPUs')
     parser.add_argument('--shared-folder-path', default='./shared_folder', type=str, help='Shared Folder')
     parser.add_argument('--job-id', default='ef_b7_all', type=str, help='id of the execution')
@@ -100,6 +100,14 @@ if __name__ == "__main__":
     parser.add_argument('--load-epoch', type=str, default="20", help='# epoch')
 
     args = parser.parse_args()
+
+    if args.gpu_node == '0':
+        os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    elif args.gpu_node == '1':
+        os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+    elif args.gpu_node == '0,1':
+        os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1'
+
     run(args.input_size
         , args.learning_rate
         , args.epochs
