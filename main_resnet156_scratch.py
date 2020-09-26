@@ -84,7 +84,7 @@ if __name__ == "__main__":
     parser.add_argument('--input-size', default=320, type=int, help='images input size')
     parser.add_argument('--epochs', default=300, type=int, help='epochs')
     parser.add_argument('--batch', default=6, type=int, help='Batch by GPU')
-    parser.add_argument('--gpu_node', default='0, 1', type=str, help='GPU nodes')
+    parser.add_argument('--gpu_node', default='0,1', type=str, help='GPU nodes')
     parser.add_argument('--workers', default=1, type=int, help='Numbers of CPUs')
     parser.add_argument('--shared-folder-path', default='./shared_folder', type=str, help='Shared Folder')
     parser.add_argument('--job-id', default='resnet156', type=str, help='id of the execution')

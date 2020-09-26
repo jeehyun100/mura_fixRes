@@ -51,7 +51,7 @@ class MURA_Dataset(object):
                 imgs = [root + str(x, encoding='utf-8').strip() for x in d]  # 所有图片的存储路径, [:-1]目的是抛弃最末尾的\n
             else:
                 imgs = [root + str(x, encoding='utf-8').strip() for x in d if
-                        str(x, encoding='utf-8').strip().split('/')[2] == part][:10]
+                        str(x, encoding='utf-8').strip().split('/')[2] == part]
 
         self.imgs = imgs
         self.train = train
