@@ -87,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument('--gpu_node', default='0,1', type=str, help='GPU nodes')
     parser.add_argument('--workers', default=1, type=int, help='Numbers of CPUs')
     parser.add_argument('--shared-folder-path', default='./shared_folder', type=str, help='Shared Folder')
-    parser.add_argument('--job-id', default='resnet156', type=str, help='id of the execution')
+    parser.add_argument('--job-id', default='resnet156_elbow', type=str, help='id of the execution')
     parser.add_argument('--data_root', default='./', type=str, help='id of the execution')
     parser.add_argument('--train_image_paths', default='MURA-v1.1/train_image_paths.csv', type=str, help='id of the execution')
     parser.add_argument('--test_image_paths', default='MURA-v1.1/valid_image_paths.csv', type=str, help='id of the execution')

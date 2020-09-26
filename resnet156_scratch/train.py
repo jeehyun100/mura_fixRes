@@ -215,7 +215,7 @@ class Trainer:
 
     def _train(self) -> Optional[float]:
         criterion = nn.CrossEntropyLoss()
-        print_freq = 1
+        print_freq = 20
         acc = None
         max_accuracy=0.0
         # Start from the loaded epoch
