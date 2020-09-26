@@ -19,13 +19,12 @@ class TrainerConfig(NamedTuple):
     input_size: int
     batch_per_gpu: int
     save_folder: str
-    imnet_path: str
+
     workers: int
-    local_rank: int
-    global_rank: int
-    num_tasks: int
+
     job_id: str
     data_root: str
     train_image_paths: str
     test_image_paths: str
-    weight_path: str
+    mura_part : str
+    load_epoch : str

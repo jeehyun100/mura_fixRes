@@ -230,6 +230,82 @@ class Trainer:
         self.loss_funcs = {"metric_loss": loss}
         self.mining_funcs = {"tuple_miner": miner}
 
+    def __eval__(self) -> Optional[float]:
+        """
+        Called for each task.
+
+        :return: The master task return the final accuracy of the model.
+        """
+        self._setup_process_group()
+        #self._init_state()
+        self._init_state_test2()
+        final_acc = self._test()
+        return final_acc
+
+    def _init_state_test2(self) -> None:
+        """
+               Initialize the state and load it from an existing checkpoint if any
+               """
+
+        """
+         Initialize the state and load it from an existing checkpoint if any
+         """
+        torch.manual_seed(0)
+        np.random.seed(0)
+        print("Create data loaders", flush=True)
+
+        Input_size_Image = self._train_cfg.input_size
+
+        Test_size = Input_size_Image
+        print("Input size : " + str(Input_size_Image))
+        print("Test size : " + str(Input_size_Image))
+        print("Initial LR :" + str(self._train_cfg.lr))
+
+        transf = get_transforms(input_size=Input_size_Image, test_size=Test_size, kind='full', crop=True,
+                                need=('train', 'val'), backbone=None)
+        transform_train = transf['train']
+        transform_test = transf['val']
+
+        self.train_set = datasets.ImageFolder(self._train_cfg.imnet_path + '/train', transform=transform_train)
+        self.test_set = datasets.ImageFolder(self._train_cfg.imnet_path + '/val', transform=transform_test)
+
+        self.train_dataset = self.train_set
+        self.val_dataset = self.test_set
+
+        # self.train_dataset = ClassDisjointMURA(self.train_set, transform_train)
+        # self.val_dataset = ClassDisjointMURA(self.test_set, transform_test)
+
+        print(f"Total batch_size: {self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks}", flush=True)
+        print("Create distributed model", flush=True)
+
+        model = models.resnet152(pretrained=False)
+        num_ftrs = model.fc.in_features
+        model.fc = common_functions.Identity()
+
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        model = torch.nn.DataParallel(model.to(device))
+        embedder = torch.nn.DataParallel(MLP([num_ftrs, 512]).to(device))
+
+        # Set optimizers
+        trunk_optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.0001)
+        embedder_optimizer = torch.optim.Adam(embedder.parameters(), lr=0.0001, weight_decay=0.0001)
+
+        # Set the loss function
+        loss = losses.TripletMarginLoss(margin=0.1)
+
+        # Set the mining function
+        miner = miners.MultiSimilarityMiner(epsilon=0.1)
+
+        # Set the dataloader sampler
+        self.sampler = samplers.MPerClassSampler(self.train_dataset.targets, m=4,
+                                                 length_before_new_iter=len(self.train_dataset))
+
+        # Package the above stuff into dictionaries.
+        self.models_dict = {"trunk": model, "embedder": embedder}
+        self.optimizers = {"trunk_optimizer": trunk_optimizer, "embedder_optimizer": embedder_optimizer}
+        self.loss_funcs = {"metric_loss": loss}
+        self.mining_funcs = {"tuple_miner": miner}
 
     def _train(self) -> Optional[float]:
         record_keeper, _, _ = logging_presets.get_record_keeper("example_logs", "example_tensorboard")

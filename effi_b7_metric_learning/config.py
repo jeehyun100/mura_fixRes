@@ -25,3 +25,7 @@ class TrainerConfig(NamedTuple):
     global_rank: int
     num_tasks: int
     job_id: str
+    data_root: str
+    train_image_paths: str
+    test_image_paths: str
+    weight_path: str

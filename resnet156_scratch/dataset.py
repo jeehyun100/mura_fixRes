@@ -33,7 +33,7 @@ def logo_filter(data, threshold=200):
 
 class MURA_Dataset(object):
 
-    def __init__(self, root, csv_path, part='all', transforms=None, train=True, test=False):
+    def __init__(self, root, csv_path, input_size, part='all', transforms=None, train=True, test=False):
         """
         主要目标： 获取所有图片的地址，并根据训练，验证，测试划分数据
 
@@ -51,11 +51,12 @@ class MURA_Dataset(object):
                 imgs = [root + str(x, encoding='utf-8').strip() for x in d]  # 所有图片的存储路径, [:-1]目的是抛弃最末尾的\n
             else:
                 imgs = [root + str(x, encoding='utf-8').strip() for x in d if
-                        str(x, encoding='utf-8').strip().split('/')[2] == part]
+                        str(x, encoding='utf-8').strip().split('/')[2] == part][:10]
 
         self.imgs = imgs
         self.train = train
         self.test = test
+        self.input_size = input_size
 
         if transforms is None:
 
@@ -63,8 +64,8 @@ class MURA_Dataset(object):
                 # 这里的X光图是1 channel的灰度图
                 self.transforms = T.Compose([
                     # T.Lambda(logo_filter),
-                    T.Resize(320),
-                    T.RandomCrop(320),
+                    T.Resize(self.input_size),
+                    T.RandomCrop(self.input_size),
                     #T.RandomHorizontalFlip(),
                     T.RandomVerticalFlip(),
                     T.RandomRotation(30),
@@ -76,8 +77,8 @@ class MURA_Dataset(object):
                 # 这里的X光图是1 channel的灰度图
                 self.transforms = T.Compose([
                     # T.Lambda(logo_filter),
-                    T.Resize(400),
-                    T.CenterCrop(320),
+                    T.Resize(int(self.input_size*1.14)),
+                    T.CenterCrop(self.input_size),
                     T.ToTensor(),
                     T.Lambda(lambda x: t.cat([x[0].unsqueeze(0), x[0].unsqueeze(0), x[0].unsqueeze(0)], 0)),  # 转换成3 channel
                     T.Normalize(mean=MURA_MEAN, std=MURA_STD),
@@ -110,7 +111,7 @@ class MURA_Dataset(object):
             label = 0
 
         # body part
-        body_part = img_path.split('/')[6]
+        body_part = img_path.split('/')[3]
 
         return data, label, img_path, body_part
 

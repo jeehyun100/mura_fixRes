@@ -12,17 +12,16 @@ import torch.distributed
 import torch.nn as nn
 import torch.optim as optim
 import attr
-from torchvision import datasets
-import torchvision.models as models
 import numpy as np
 from .config import TrainerConfig, ClusterConfig
-from .transforms import get_transforms
-from .samplers import RASampler
+#from .transforms import get_transforms
+#from .samplers import RASampler
+import torchvision.models as models
 import timm
-import tqdm
+#import tqdm
 from sklearn.metrics import cohen_kappa_score
 import csv
-from dataset import MURA_Dataset
+from .dataset import MURA_Dataset
 
 
 def conv_numpy_tensor(output):
@@ -93,7 +92,7 @@ class Trainer:
         """
         self._setup_process_group()
         #self._init_state()
-        self._init_state_test2()
+        self._init_state_test()
         final_acc = self._test()
         return final_acc
 
@@ -108,180 +107,55 @@ class Trainer:
         return empty_trainer
 
     def _setup_process_group(self) -> None:
-        # torch.cuda.set_device(self._train_cfg.local_rank)
-        # torch.distributed.init_process_group(
-        #     backend=self._cluster_cfg.dist_backend,
-        #     init_method=self._cluster_cfg.dist_url,
-        #     world_size=self._train_cfg.num_tasks,
-        #     rank=self._train_cfg.global_rank,
-        # )
-        torch.device('cpu')
-
-        print(f"Process group: {self._train_cfg.num_tasks} tasks, rank: {self._train_cfg.global_rank}")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def _init_state_test(self) -> None:
         """
-        Initialize the state and load it from an existing checkpoint if any
-        """
+            Initialize the state and load it from an existing checkpoint if any
+            """
         torch.manual_seed(0)
         np.random.seed(0)
-        print("Create data loaders", flush=True)
 
         Input_size_Image = self._train_cfg.input_size
 
-        Test_size = Input_size_Image
+        # Test_size=Input_size_Image
         print("Input size : " + str(Input_size_Image))
         print("Test size : " + str(Input_size_Image))
         print("Initial LR :" + str(self._train_cfg.lr))
-
-        # transf = get_transforms(input_size=Input_size_Image, test_size=Test_size, kind='full', crop=True,
-        #                         need=('train', 'val'), backbone=None)
-        # transform_train = transf['train']
-        # transform_test = transf['val']
-
-        test_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.test_image_paths, train=False, test=False)
-
-        self._test_loader = torch.utils.data.DataLoader(
-            test_set, batch_size=self._train_cfg.batch_per_gpu, shuffle=False, num_workers=(self._train_cfg.workers-1),#sampler=test_sampler, Attention je le met pas pour l instant
-        )
-
-        # train_set = datasets.ImageFolder(self._train_cfg.imnet_path + '/train', transform=transform_train)
-        # train_sampler = RASampler(
-        #     train_set, self._train_cfg.num_tasks, self._train_cfg.global_rank, len(train_set),
-        #     self._train_cfg.batch_per_gpu, repetitions=3, len_factor=2.0, shuffle=True, drop_last=False
-        # )
-        #
-        # self._train_loader = torch.utils.data.DataLoader(
-        #     train_set,
-        #     batch_size=self._train_cfg.batch_per_gpu,
-        #     num_workers=(self._train_cfg.workers - 1),
-        #     sampler=train_sampler,
-        # )
-        # test_set = datasets.ImageFolder(self._train_cfg.imnet_path + '/val', transform=transform_test)
-        #
-        # self._test_loader = torch.utils.data.DataLoader(
-        #     test_set, batch_size=self._train_cfg.batch_per_gpu, shuffle=False,
-        #     num_workers=(self._train_cfg.workers - 1),  # sampler=test_sampler, Attention je le met pas pour l instant
-        # )
-
-        print(f"Total batch_size: {self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks}", flush=True)
-
-        print("Create distributed model", flush=True)
-        # model = models.resnet50(pretrained=False)
-        # models.
-
-        model = timm.create_model('efficientnet_b7', pretrained=False)
-        # model = models.resnet152(pretrained=False)
-        num_ftrs = model.classifier.in_features
-        model.classifier = nn.Linear(num_ftrs, 2)
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model.to(device)
-
-        # model.cuda(self._train_cfg.local_rank)
-        # model = torch.nn.parallel.DistributedDataParallel(
-        #     model, device_ids=[self._train_cfg.local_rank], output_device=self._train_cfg.local_rank
-        # )
-        linear_scaled_lr = 8.0 * self._train_cfg.lr * self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks / 512.0
-        # optimizer = optim.SGD(model.parameters(), lr=linear_scaled_lr, momentum=0.9,weight_decay=1e-4)
-
-        optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=1e-5)
-
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30000)
-        self._state = TrainerState(
-            epoch=0, accuracy=0.0, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler
-        )
-        checkpoint_fn = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id), str(self._train_cfg.weight_path))
-        if os.path.isfile(checkpoint_fn):
-            print(f"Load existing checkpoint from {checkpoint_fn}", flush=True)
-            self._state = TrainerState.load(checkpoint_fn, default=self._state)
-            print("load done")
-
-    def _init_state_test2(self) -> None:
-        """
-               Initialize the state and load it from an existing checkpoint if any
-               """
-        torch.manual_seed(0)
-        np.random.seed(0)
         print("Create data loaders", flush=True)
 
-        Input_size_Image = self._train_cfg.input_size
-
-        Test_size = Input_size_Image
-        print("Input size : " + str(Input_size_Image))
-        print("Test size : " + str(Input_size_Image))
-        print("Initial LR :" + str(self._train_cfg.lr))
-
-        transf = get_transforms(input_size=Input_size_Image, test_size=Test_size, kind='full', crop=True,
-                                need=('train', 'val'), backbone=None)
-        transform_train = transf['train']
-        transform_test = transf['val']
-
-        # train_set2 = datasets.ImageFolder(self._train_cfg.imnet_path + '/train',transform=transform_train)
-        # step 2: data
-        train_set = MURA_Dataset(self._train_cfg.data_root,
-                                 self._train_cfg.data_root + self._train_cfg.train_image_paths, train=True, test=False)
-
-        train_sampler = RASampler(
-            train_set, self._train_cfg.num_tasks, self._train_cfg.global_rank, len(train_set),
-            self._train_cfg.batch_per_gpu, repetitions=3, len_factor=2.0, shuffle=True, drop_last=False
-        )
-        self._train_loader = torch.utils.data.DataLoader(
-            train_set,
-            batch_size=self._train_cfg.batch_per_gpu,
-            num_workers=(self._train_cfg.workers - 1),
-            sampler=train_sampler,
-        )
-        # self._train_loader2 = torch.utils.data.DataLoader(
-        #     train_set2,
-        #     batch_size=self._train_cfg.batch_per_gpu,
-        #     num_workers=(self._train_cfg.workers-1),
-        #     sampler=train_sampler,
-        # )
-        # test_set = datasets.ImageFolder(self._train_cfg.imnet_path  + '/val',transform=transform_test)
-        test_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.test_image_paths,
-                                train=False, test=False)
+        test_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.test_image_paths
+                                , input_size=self._train_cfg.input_size, part=self._train_cfg.mura_part, train=False,
+                                test=False)
 
         self._test_loader = torch.utils.data.DataLoader(
             test_set, batch_size=self._train_cfg.batch_per_gpu, shuffle=False,
             num_workers=(self._train_cfg.workers - 1),  # sampler=test_sampler, Attention je le met pas pour l instant
         )
 
-        print(f"Total batch_size: {self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks}", flush=True)
+        #model = timm.create_model('efficientnet_b7', pretrained=False)
+        model = models.resnet152(pretrained=False)
+        # num_ftrs = model.classifier.in_features
+        # model.classifier = nn.Linear(num_ftrs, 2)
+        num_ftrs = model.fc.in_features
+        model.fc = nn.Linear(num_ftrs, 2)
 
-        print("Create distributed model", flush=True)
-        # model = models.resnet50(pretrained=False)
-        # models.
-
-        model = timm.create_model('efficientnet_b7', pretrained=False)
-        # model = models.resnet152(pretrained=False)
-        num_ftrs = model.classifier.in_features
-        model.classifier = nn.Linear(num_ftrs, 2)
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        # model.to(device)
         if torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
-        model.to(device)
-
-        # model.cuda(self._train_cfg.local_rank)
-        # model = torch.nn.parallel.DistributedDataParallel(
-        #     model, device_ids=[self._train_cfg.local_rank], output_device=self._train_cfg.local_rank
-        # )
-        linear_scaled_lr = 8.0 * self._train_cfg.lr * self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks / 512.0
-        # optimizer = optim.SGD(model.parameters(), lr=linear_scaled_lr, momentum=0.9,weight_decay=1e-4)
+        model.to(self.device)
 
         optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=1e-5)
-
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30000)
+
         self._state = TrainerState(
             epoch=0, accuracy=0.0, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler
         )
-        checkpoint_fn = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id), "checkpoint_125.pth")
+
+        checkpoint_fn = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id), "checkpoint_{0}.pth".format(str(self._train_cfg.load_epoch)))
         if os.path.isfile(checkpoint_fn):
             print(f"Load existing checkpoint from {checkpoint_fn}", flush=True)
             self._state = TrainerState.load(checkpoint_fn, default=self._state)
-            print("model load")
+            print("model_load")
 
     def _init_state(self) -> None:
         """
@@ -289,78 +163,50 @@ class Trainer:
         """
         torch.manual_seed(0)
         np.random.seed(0)
-        print("Create data loaders", flush=True)
-        
         Input_size_Image=self._train_cfg.input_size
         
-        Test_size=Input_size_Image
+        #Test_size=Input_size_Image
         print("Input size : "+str(Input_size_Image))
         print("Test size : "+str(Input_size_Image))
         print("Initial LR :"+str(self._train_cfg.lr))
-        
-        transf=get_transforms(input_size=Input_size_Image,test_size=Test_size, kind='full', crop=True, need=('train', 'val'), backbone=None)
-        transform_train = transf['train']
-        transform_test = transf['val']
-        
-        #train_set2 = datasets.ImageFolder(self._train_cfg.imnet_path + '/train',transform=transform_train)
-        # step 2: data
-        train_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.train_image_paths, train=True, test=False)
 
-        train_sampler = RASampler(
-            train_set,self._train_cfg.num_tasks,self._train_cfg.global_rank,len(train_set),self._train_cfg.batch_per_gpu,repetitions=3,len_factor=2.0,shuffle=True, drop_last=False
-        )
+        print("Create data loaders", flush=True)
+        train_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.train_image_paths
+                                 ,input_size = self._train_cfg.input_size , part=self._train_cfg.mura_part, train=True, test=False)
+
         self._train_loader = torch.utils.data.DataLoader(
             train_set,
             batch_size=self._train_cfg.batch_per_gpu,
             num_workers=(self._train_cfg.workers-1),
-            sampler=train_sampler,
+            shuffle=True
+            #sampler=train_sampler,
         )
-        # self._train_loader2 = torch.utils.data.DataLoader(
-        #     train_set2,
-        #     batch_size=self._train_cfg.batch_per_gpu,
-        #     num_workers=(self._train_cfg.workers-1),
-        #     sampler=train_sampler,
-        # )
-        #test_set = datasets.ImageFolder(self._train_cfg.imnet_path  + '/val',transform=transform_test)
-        test_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.test_image_paths, train=False, test=False)
+
+        test_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.test_image_paths
+                                , input_size = self._train_cfg.input_size, part=self._train_cfg.mura_part, train=False, test=False )
 
         self._test_loader = torch.utils.data.DataLoader(
             test_set, batch_size=self._train_cfg.batch_per_gpu, shuffle=False, num_workers=(self._train_cfg.workers-1),#sampler=test_sampler, Attention je le met pas pour l instant
         )
 
-        print(f"Total batch_size: {self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks}", flush=True)
+        #model = timm.create_model('efficientnet_b7', pretrained=False)
+        model = models.resnet152(pretrained=False)
+        # num_ftrs = model.classifier.in_features
+        # model.classifier = nn.Linear(num_ftrs, 2)
+        num_ftrs = model.fc.in_features
+        model.fc = nn.Linear(num_ftrs, 2)
 
-        print("Create distributed model", flush=True)
-        #model = models.resnet50(pretrained=False)
-        #models.
-
-
-
-        model = timm.create_model('efficientnet_b7', pretrained=False)
-        #model = models.resnet152(pretrained=False)
-        num_ftrs = model.classifier.in_features
-        model.classifier = nn.Linear(num_ftrs, 2)
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #model.to(device)
         if torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
-        model.to(device)
-
-
-        # model.cuda(self._train_cfg.local_rank)
-        # model = torch.nn.parallel.DistributedDataParallel(
-        #     model, device_ids=[self._train_cfg.local_rank], output_device=self._train_cfg.local_rank
-        # )
-        linear_scaled_lr = 8.0 * self._train_cfg.lr * self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks /512.0
-        #optimizer = optim.SGD(model.parameters(), lr=linear_scaled_lr, momentum=0.9,weight_decay=1e-4)
+        model.to(self.device)
 
         optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=1e-5 )
-
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30000)
+
         self._state = TrainerState(
             epoch=0,accuracy=0.0, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler
         )
+
         checkpoint_fn = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id), "checkpoint.pth")
         if os.path.isfile(checkpoint_fn):
             print(f"Load existing checkpoint from {checkpoint_fn}", flush=True)
@@ -368,9 +214,8 @@ class Trainer:
             print("model_load")
 
     def _train(self) -> Optional[float]:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         criterion = nn.CrossEntropyLoss()
-        print_freq = 10
+        print_freq = 1
         acc = None
         max_accuracy=0.0
         # Start from the loaded epoch
@@ -382,15 +227,12 @@ class Trainer:
             self._state.epoch = epoch
             running_loss = 0.0
             count=0
+            total_step = len(self._train_loader)
             for i, data in enumerate(self._train_loader):
                 inputs, labels, _, body_part = data
-                #inputs, labels = data
 
-                # inputs = inputs.cuda(self._train_cfg.local_rank, non_blocking=True)
-                # labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
-
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+                inputs = inputs.to(self.device)
+                labels = labels.to(self.device)
 
                 outputs = self._state.model(inputs)
                 loss = criterion(outputs, labels)
@@ -402,15 +244,12 @@ class Trainer:
                 running_loss += loss.item()
                 count=count+1
                 if i % print_freq == print_freq - 1:
-                    print(f"[{epoch:02d}, {i:05d}] loss: {running_loss/print_freq:.3f}", flush=True)
+                    print('Epoch [{0}/{1}], Step [{2}/{3}], Loss: {4:.4f}'
+                          .format(epoch + 1, self._train_cfg.epochs, i + 1, total_step, running_loss/print_freq))
                     running_loss = 0.0
-                if count>=5005 * 512 /(self._train_cfg.batch_per_gpu * self._train_cfg.num_tasks):
-                    break
-                
-            #if epoch==self._train_cfg.epochs-1:
-            if epoch%4 == 1 or epoch == 0:
+
+            if epoch%1 == 0 or epoch == 0:
                 print("Start evaluation of the model", flush=True)
-                
                 correct = 0
                 total = 0
                 count=0.0
@@ -419,12 +258,9 @@ class Trainer:
                 with torch.no_grad():
                     for data in self._test_loader:
                         images, labels, _, body_part = data
-                        #images, labels = data
-                        # images = images.cuda(self._train_cfg.local_rank, non_blocking=True)
-                        # labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
 
-                        images = images.to(device)
-                        labels = labels.to(device)
+                        images = images.to(self.device)
+                        labels = labels.to(self.device)
 
                         outputs = self._state.model(images)
                         loss_val = criterion(outputs, labels)
@@ -436,21 +272,22 @@ class Trainer:
 
                 acc = correct / total
                 ls_nm=running_val_loss/count
-                print(f"Accuracy of the network on the 50000 test images: {acc:.1%}", flush=True)
-                print(f"Loss of the network on the 50000 test images: {ls_nm:.3f}", flush=True)
+
+                print('Epoch [{0}/{1}], Step [{2}/{3}], Val Loss: {4:.4f} Val Acc: {5:.2f}'
+                      .format(epoch + 1, self._train_cfg.epochs, i + 1, total_step, ls_nm, acc))
+
                 self._state.accuracy = acc
-                if self._train_cfg.global_rank == 0:
+                max_accuracy=np.max((max_accuracy, acc))
+
+                # Save for best accuracy models
+                if max_accuracy >= acc :
+                    print("Epoch [{0}/{1}], Save Best Model[accuracy {0}]".format(epoch + 1, self._train_cfg.epochs, acc))
                     self.checkpoint(rm_init=False)
-                print("accuracy val epoch "+str(epoch)+" acc= "+str(acc))
-                max_accuracy=np.max((max_accuracy,acc))
+
                 if epoch==self._train_cfg.epochs-1:
                     return acc
 
-
-
     def _test(self) -> Optional[float]:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        criterion = nn.CrossEntropyLoss()
         self._state.model.eval()
         print("Start evaluation of the model", flush=True)
 
@@ -461,38 +298,29 @@ class Trainer:
         with torch.no_grad():
             for data in self._test_loader:
                 images, labels, _, body_part = data
-                #images, labels = data
-                # images = images.cuda(self._train_cfg.local_rank, non_blocking=True)
-                # labels = labels.cuda(self._train_cfg.local_rank, non_blocking=True)
 
-                images = images.to(device)
-                labels = labels.to(device)
+                images = images.to(self.device)
+                labels = labels.to(self.device)
 
                 outputs = self._state.model(images)
-                #loss_val = criterion(outputs, labels)
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
-                #running_val_loss += loss_val.item()
+
                 count = count + 1.0
-                #img_pred = (labels, predicted )
+
                 batch_results = [(labels_, predicted_, body_part_) for labels_, predicted_, body_part_  in zip(labels.cpu().numpy(), predicted.cpu().numpy(), body_part)]
-                results += batch_results#.append(img_pred)
+                results += batch_results
 
-                #probability = t.nn.functional.softmax(score)[:, 0].data.tolist()
-
-                # 每一行为 图片路径 和 positive的概率
-                #batch_results = [(path_, probability_) for path_, probability_ in zip(path, probability)]
-
-                #results += batch_results
-
-        #self.write_csv(results, "eff_predict.csv")
         acc = correct / total
         np_result = np.array(results)
         kappa_score = cohen_kappa_score(np_result[:,0], np_result[:,1])
 
-        print("cohen kappa", kappa_score)
-        XR_type_list = ['XR_ELBOW', 'XR_FINGER', 'XR_FOREARM', 'XR_HAND', 'XR_HUMERUS', 'XR_SHOULDER', 'XR_WRIST']
+        print("All cohen kappa", kappa_score)
+        if self._train_cfg.mura_part == 'all':
+            XR_type_list = ['XR_ELBOW', 'XR_FINGER', 'XR_FOREARM', 'XR_HAND', 'XR_HUMERUS', 'XR_SHOULDER', 'XR_WRIST']
+        else:
+            XR_type_list = [self._train_cfg.mura_part]
         for xr_type in XR_type_list:
             xr_type_correct = 0
             xr_type_result = np_result[np.where(np_result[:, 2] == xr_type)][:,0:2]
@@ -501,74 +329,6 @@ class Trainer:
             print('cohen_kappa {0} : {1:.2f}'.format(xr_type,xr_type_cohen_kappa ))
             print('ACC {0} : {1:.2f}'.format(xr_type,xr_type_correct/xr_type_result.shape[0] ))
 
-        #np.unique(np_result[np.where(np_result[:, 2] == 'XR_WRIST')][:, 2])
-        #ls_nm = running_val_loss / count
         print(f"Accuracy of the network on the 50000 test images: {acc:.1%}", flush=True)
-        #print(f"Loss of the network on the 50000 test images: {ls_nm:.3f}", flush=True)
         self._state.accuracy = acc
-        # if self._train_cfg.global_rank == 0:
-        #     self.checkpoint(rm_init=False)
-        #print("accuracy val epoch " + str(epoch) + " acc= " + str(acc))
-        #max_accuracy = np.max((max_accuracy, acc))
-        #if epoch == self._train_cfg.epochs - 1:
         return acc
-
-    def write_csv(self, results, file_name):
-        with open(file_name, 'w') as f:
-            writer = csv.writer(f)
-            writer.writerow(['image', 'probability'])
-            writer.writerows(results)
-
-    def calculate_cohen_kappa(threshold=0.5):
-        input_csv_file_path = 'result.csv'
-
-        result_dict = {}
-        with open(input_csv_file_path, 'r') as F:
-            d = F.readlines()[1:]
-            for data in d:
-                (path, prob) = data.split(',')
-
-                folder_path = path[:path.rfind('/')]
-                prob = float(prob)
-
-                if folder_path in result_dict.keys():
-                    result_dict[folder_path].append(prob)
-                else:
-                    result_dict[folder_path] = [prob]
-
-        for k, v in result_dict.items():
-            result_dict[k] = np.mean(v)
-            # visualize
-            # print(k, result_dict[k])
-        output_csv_path = 'predictions.csv'
-        # 写入每个study的诊断csv
-        with open(output_csv_path, 'w') as F:
-            writer = csv.writer(F)
-            for k, v in result_dict.items():
-                path = k[len(opt.data_root):] + '/'
-                value = 0 if v >= threshold else 1
-                writer.writerow([path, value])
-
-        XR_type_list = ['XR_ELBOW', 'XR_FINGER', 'XR_FOREARM', 'XR_HAND', 'XR_HUMERUS', 'XR_SHOULDER', 'XR_WRIST']
-
-        for XR_type in XR_type_list:
-            # 提取出 XR_type 下的所有folder路径，即 result_dict 中的key
-            keys = [k for k, v in result_dict.items() if k.split('/')[6] == XR_type]
-
-            y_true = [1 if key.split('_')[-1] == 'positive' else 0 for key in keys]
-            y_pred = [0 if result_dict[key] >= threshold else 1 for key in keys]
-
-            print('--------------------------------------------')
-
-            kappa_score = cohen_kappa_score(y_true, y_pred)
-
-            print(XR_type, kappa_score)
-
-            # 预测准确的个数
-            count = sum([1 if y_pred[i] == y_true[i] else 0 for i in range(len(y_true))])
-            print(XR_type, 'Accuracy', 100.0 * count / len(y_true))
-
-
-
-
-
