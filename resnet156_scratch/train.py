@@ -201,7 +201,7 @@ class Trainer:
         model.to(self.device)
 
         optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=1e-5 )
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30000)
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=70)
 
         self._state = TrainerState(
             epoch=0,accuracy=0.0, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler

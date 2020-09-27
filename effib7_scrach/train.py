@@ -21,6 +21,7 @@ import timm
 from sklearn.metrics import cohen_kappa_score
 import csv
 from .dataset import MURA_Dataset
+import cv2
 
 
 def conv_numpy_tensor(output):
@@ -94,6 +95,16 @@ class Trainer:
         self._init_state_test()
         final_acc = self._test()
         return final_acc
+
+    def __show__(self) -> Optional[float]:
+        """
+        Called for each task.
+
+        :return: The master task return the final accuracy of the model.
+        """
+        self._setup_process_group()
+        self._show()
+
 
     def checkpoint(self, rm_init=True):
         save_dir = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id))
@@ -210,7 +221,7 @@ class Trainer:
 
     def _train(self) -> Optional[float]:
         criterion = nn.CrossEntropyLoss()
-        print_freq = 20
+        print_freq = 10
         acc = None
         max_accuracy=0.0
         # Start from the loaded epoch
@@ -327,3 +338,41 @@ class Trainer:
         print(f"Accuracy of the network on the 50000 test images: {acc:.1%}", flush=True)
         self._state.accuracy = acc
         return acc
+
+    def _show(self) -> Optional[float]:
+
+        print("Create data loaders", flush=True)
+        train_set = MURA_Dataset(self._train_cfg.data_root,
+                                 self._train_cfg.data_root + self._train_cfg.train_image_paths
+                                 , input_size=self._train_cfg.input_size, part=self._train_cfg.mura_part, train=True,
+                                 test=False)
+
+        self._train_loader = torch.utils.data.DataLoader(
+            train_set,
+            batch_size=self._train_cfg.batch_per_gpu,
+            num_workers=(self._train_cfg.workers - 1),
+            shuffle=True
+            # sampler=train_sampler,
+        )
+
+        test_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.test_image_paths
+                                , input_size=self._train_cfg.input_size, part=self._train_cfg.mura_part, train=False,
+                                test=False)
+
+        self._test_loader = torch.utils.data.DataLoader(
+            test_set, batch_size=self._train_cfg.batch_per_gpu, shuffle=False,
+            num_workers=(self._train_cfg.workers - 1),  # sampler=test_sampler, Attention je le met pas pour l instant
+        )
+
+        for i, data in enumerate(self._train_loader):
+            inputs, labels, _, body_part = data
+
+            inputs = inputs.to(self.device)
+            labels = labels.to(self.device)
+            for i in range(inputs.shape[0]):
+                img_data = inputs.cpu().numpy()[i]
+                img_data = np.transpose(img_data, (1,2,0))
+                #img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
+                cv2.imshow('image', img_data)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
