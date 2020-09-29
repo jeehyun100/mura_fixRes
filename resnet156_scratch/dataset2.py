@@ -4,6 +4,7 @@ import numpy as np
 import torch as t
 from PIL import Image
 from torchvision import transforms as T
+import cv2
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -71,7 +72,8 @@ class MURA_Dataset(object):
                     T.RandomRotation(30),
                     T.ToTensor(),
                     T.Lambda(lambda x: t.cat([x[0].unsqueeze(0), x[0].unsqueeze(0), x[0].unsqueeze(0)], 0)),  # 转换成3 channel
-                    T.Normalize(mean=MURA_MEAN, std=MURA_STD),
+                    #T.Normalize(mean=MURA_MEAN, std=MURA_STD),
+                    T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                 ])
             if not self.train:
                 # 这里的X光图是1 channel的灰度图
@@ -81,7 +83,8 @@ class MURA_Dataset(object):
                     T.CenterCrop(self.input_size),
                     T.ToTensor(),
                     T.Lambda(lambda x: t.cat([x[0].unsqueeze(0), x[0].unsqueeze(0), x[0].unsqueeze(0)], 0)),  # 转换成3 channel
-                    T.Normalize(mean=MURA_MEAN, std=MURA_STD),
+                    #T.Normalize(mean=MURA_MEAN, std=MURA_STD),
+                    T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                 ])
 
     def __getitem__(self, index):
@@ -90,8 +93,15 @@ class MURA_Dataset(object):
         """
 
         img_path = self.imgs[index]
+        img = cv2.imread(img_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        data = Image.open(img_path)
+        # contrast limit가 2이고 title의 size는 8X8
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        img2 = clahe.apply(img)
+
+        data = Image.fromarray(img2)
+        #data = Image.open(img_path)
 
         data = self.transforms(data)
 

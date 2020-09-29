@@ -78,16 +78,51 @@ def test(input_sizes, learning_rate, epochs, batch, workers, shared_folder_path,
     except Exception as e:
         print("Job failed : {0}, {1}".format(e, e.__traceback__.tb_lineno))
 
+def show(input_sizes, learning_rate, epochs, batch, workers, shared_folder_path, job_id, data_root,
+         train_image_paths,
+         test_image_paths, mura_part, load_epoch):
+    # Distribution config but it is not used
+    cluster_cfg = ClusterConfig(dist_backend="nccl", dist_url="")
+    data_folder_Path = None
+    if Path(str(shared_folder_path)).is_dir() == False:
+        raise RuntimeError("No shared folder available")
+
+    train_cfg = TrainerConfig(
+        data_folder=str(data_folder_Path),
+        epochs=epochs,
+        lr=learning_rate,
+        input_size=input_sizes,
+        batch_per_gpu=batch,
+        save_folder=str(shared_folder_path),
+        workers=workers,
+        job_id=job_id,
+        data_root=data_root,
+        train_image_paths=train_image_paths,
+        test_image_paths=test_image_paths,
+        mura_part=mura_part,
+        load_epoch=load_epoch
+    )
+
+    trainer = Trainer(train_cfg, cluster_cfg)
+
+    # The code should be launch on each GPUs
+    try:
+        trainer.__show__()
+        # print(f"Validation accuracy: {val_accuracy}")
+    except Exception as e:
+        print("Job failed : {0}, {1}".format(e, e.__traceback__.tb_lineno))
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="Training script for ResNet50 FixRes",formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('--learning-rate', default=0.0001 , type=float, help='base learning rate')
     parser.add_argument('--input-size', default=320, type=int, help='images input size')
-    parser.add_argument('--epochs', default=300, type=int, help='epochs')
-    parser.add_argument('--batch', default=6, type=int, help='Batch by GPU')
-    parser.add_argument('--gpu_node', default='0,1', type=str, help='GPU nodes')
+    parser.add_argument('--epochs', default=90, type=int, help='epochs')
+    parser.add_argument('--batch', default=10, type=int, help='Batch by GPU')
+    parser.add_argument('--gpu_node', default='0', type=str, help='GPU nodes')
     parser.add_argument('--workers', default=1, type=int, help='Numbers of CPUs')
     parser.add_argument('--shared-folder-path', default='./shared_folder', type=str, help='Shared Folder')
-    parser.add_argument('--job-id', default='resnet156_elbow', type=str, help='id of the execution')
+    parser.add_argument('--job-id', default='r156_elbow_heq_nor', type=str, help='id of the execution')
     parser.add_argument('--data_root', default='./', type=str, help='id of the execution')
     parser.add_argument('--train_image_paths', default='MURA-v1.1/train_image_paths.csv', type=str, help='id of the execution')
     parser.add_argument('--test_image_paths', default='MURA-v1.1/valid_image_paths.csv', type=str, help='id of the execution')
@@ -129,3 +164,17 @@ if __name__ == "__main__":
     #     , args.test_image_paths
     #     , args.mura_part
     #     , args.load_epoch)
+
+    # show(args.input_size
+    #     , args.learning_rate
+    #     , args.epochs
+    #     , args.batch
+    #     , args.workers
+    #     , args.shared_folder_path
+    #     , args.job_id
+    #     , args.data_root
+    #     , args.train_image_paths
+    #     , args.test_image_paths
+    #     , args.mura_part
+    #     , args.load_epoch)
+

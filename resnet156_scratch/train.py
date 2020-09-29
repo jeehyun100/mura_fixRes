@@ -22,6 +22,7 @@ import timm
 from sklearn.metrics import cohen_kappa_score
 import csv
 from .dataset import MURA_Dataset
+import cv2
 
 
 def conv_numpy_tensor(output):
@@ -96,6 +97,16 @@ class Trainer:
         final_acc = self._test()
         return final_acc
 
+    def __show__(self) -> Optional[float]:
+        """
+        Called for each task.
+
+        :return: The master task return the final accuracy of the model.
+        """
+        self._setup_process_group()
+        self._show()
+
+
     def checkpoint(self, rm_init=True):
         save_dir = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id))
         os.makedirs(save_dir, exist_ok=True)
@@ -145,7 +156,8 @@ class Trainer:
         model.to(self.device)
 
         optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=1e-5)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30000)
+        lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[50, 75], gamma=0.25)
+        #lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30000)
 
         self._state = TrainerState(
             epoch=0, accuracy=0.0, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler
@@ -200,8 +212,10 @@ class Trainer:
             model = nn.DataParallel(model)
         model.to(self.device)
 
+        #optimizer = t.optim.Adam(model.parameters(), lr=lr, weight_decay=opt.weight_decay)
+
         optimizer = optim.Adam(model.parameters(), lr=self._train_cfg.lr, weight_decay=1e-5 )
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=70)
+        lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[50, 75], gamma=0.5)
 
         self._state = TrainerState(
             epoch=0,accuracy=0.0, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler
@@ -220,12 +234,15 @@ class Trainer:
         max_accuracy=0.0
         # Start from the loaded epoch
         start_epoch = self._state.epoch
+        previous_loss = 1e10
+        lr = self._train_cfg.lr
         for epoch in range(start_epoch, self._train_cfg.epochs):
             print(f"Start epoch {epoch}", flush=True)
             self._state.model.train()
-            self._state.lr_scheduler.step(epoch)
+            #self._state.lr_scheduler.step()
             self._state.epoch = epoch
             running_loss = 0.0
+            current_loss = 0.0
             count=0
             total_step = len(self._train_loader)
             for i, data in enumerate(self._train_loader):
@@ -243,10 +260,27 @@ class Trainer:
 
                 running_loss += loss.item()
                 count=count+1
+                current_loss += loss.item()
+
                 if i % print_freq == print_freq - 1:
                     print('Epoch [{0}/{1}], Step [{2}/{3}], Loss: {4:.4f}'
                           .format(epoch + 1, self._train_cfg.epochs, i + 1, total_step, running_loss/print_freq))
                     running_loss = 0.0
+
+            # update learning rate
+            if current_loss/count > previous_loss:
+                # if val_loss > previous_loss:
+                lr= lr * 0.5
+                #lr = lr * opt.lr_decay
+                # 第二种降低学习率的方法:不会有moment等信息的丢失
+                for param_group in self._state.optimizer.param_groups:
+                    param_group['lr'] = lr#self._train_cfg.lr
+                    print("loss decay {0} , decay factor{1}".format(lr, 0.5 ))
+
+            # previous_loss = val_loss
+            previous_loss = current_loss/count
+            current_loss=0
+            count=0
 
             if epoch%1 == 0 or epoch == 0:
                 print("Start evaluation of the model", flush=True)
@@ -280,7 +314,7 @@ class Trainer:
                 max_accuracy=np.max((max_accuracy, acc))
 
                 # Save for best accuracy models
-                if max_accuracy >= acc :
+                if acc >= max_accuracy :
                     print("Epoch [{0}/{1}], Save Best Model[accuracy {0}]".format(epoch + 1, self._train_cfg.epochs, acc))
                     self.checkpoint(rm_init=False)
 
@@ -332,3 +366,41 @@ class Trainer:
         print(f"Accuracy of the network on the 50000 test images: {acc:.1%}", flush=True)
         self._state.accuracy = acc
         return acc
+
+    def _show(self) -> Optional[float]:
+
+        print("Create data loaders", flush=True)
+        train_set = MURA_Dataset(self._train_cfg.data_root,
+                                 self._train_cfg.data_root + self._train_cfg.train_image_paths
+                                 , input_size=self._train_cfg.input_size, part=self._train_cfg.mura_part, train=True,
+                                 test=False)
+
+        self._train_loader = torch.utils.data.DataLoader(
+            train_set,
+            batch_size=self._train_cfg.batch_per_gpu,
+            num_workers=(self._train_cfg.workers - 1),
+            shuffle=True
+            # sampler=train_sampler,
+        )
+
+        test_set = MURA_Dataset(self._train_cfg.data_root, self._train_cfg.data_root + self._train_cfg.test_image_paths
+                                , input_size=self._train_cfg.input_size, part=self._train_cfg.mura_part, train=False,
+                                test=False)
+
+        self._test_loader = torch.utils.data.DataLoader(
+            test_set, batch_size=self._train_cfg.batch_per_gpu, shuffle=False,
+            num_workers=(self._train_cfg.workers - 1),  # sampler=test_sampler, Attention je le met pas pour l instant
+        )
+
+        for i, data in enumerate(self._train_loader):
+            inputs, labels, _, body_part = data
+
+            inputs = inputs.to(self.device)
+            labels = labels.to(self.device)
+            for i in range(inputs.shape[0]):
+                img_data = inputs.cpu().numpy()[i]
+                img_data = np.transpose(img_data, (1,2,0))
+                #img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
+                cv2.imshow('image', img_data)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()

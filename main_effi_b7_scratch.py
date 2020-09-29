@@ -118,10 +118,10 @@ if __name__ == "__main__":
                             formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('--learning-rate', default=0.0001, type=float, help='base learning rate')
     parser.add_argument('--input-size', default=320, type=int, help='images input size')
-    parser.add_argument('--epochs', default=100, type=int, help='epochs')
+    parser.add_argument('--epochs', default=10, type=int, help='epochs')
     parser.add_argument('--batch', default=6, type=int, help='Batch by GPU')
     parser.add_argument('--gpu_node', default='0,1', type=str, help='GPU nodes')
-    parser.add_argument('--workers', default=1, type=int, help='Numbers of CPUs')
+    parser.add_argument('--workers', default=4, type=int, help='Numbers of CPUs')
     parser.add_argument('--shared-folder-path', default='./shared_folder', type=str, help='Shared Folder')
     parser.add_argument('--job-id', default='ef_b7_elbow', type=str, help='id of the execution')
     parser.add_argument('--data_root', default='./', type=str, help='id of the execution')
@@ -142,18 +142,18 @@ if __name__ == "__main__":
     elif args.gpu_node == '0,1':
         os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1'
 
-    # run(args.input_size
-    #     , args.learning_rate
-    #     , args.epochs
-    #     , args.batch
-    #     , args.workers
-    #     , args.shared_folder_path
-    #     , args.job_id
-    #     , args.data_root
-    #     , args.train_image_paths
-    #     , args.test_image_paths
-    #     , args.mura_part
-    #     , args.load_epoch)
+    run(args.input_size
+        , args.learning_rate
+        , args.epochs
+        , args.batch
+        , args.workers
+        , args.shared_folder_path
+        , args.job_id
+        , args.data_root
+        , args.train_image_paths
+        , args.test_image_paths
+        , args.mura_part
+        , args.load_epoch)
 
     # test(args.input_size
     #     , args.learning_rate
@@ -168,17 +168,17 @@ if __name__ == "__main__":
     #     , args.mura_part
     #     , args.load_epoch)
 
-    show(args.input_size
-        , args.learning_rate
-        , args.epochs
-        , args.batch
-        , args.workers
-        , args.shared_folder_path
-        , args.job_id
-        , args.data_root
-        , args.train_image_paths
-        , args.test_image_paths
-        , args.mura_part
-        , args.load_epoch)
-
-
+    # show(args.input_size
+    #     , args.learning_rate
+    #     , args.epochs
+    #     , args.batch
+    #     , args.workers
+    #     , args.shared_folder_path
+    #     , args.job_id
+    #     , args.data_root
+    #     , args.train_image_paths
+    #     , args.test_image_paths
+    #     , args.mura_part
+    #     , args.load_epoch)
+    #
+    #
