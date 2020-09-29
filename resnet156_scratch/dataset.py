@@ -31,6 +31,70 @@ def logo_filter(data, threshold=200):
 
     return im
 
+def crop_minAreaRect(img, rect):
+
+    size = rect[1]
+    angle = rect[2]
+    (h, w) = size[0], size[1]
+    (cX, cY) = rect[0]
+    rotated = False
+    angle = rect[2]
+
+    if (angle < -45 and (h > w)) or angle == -90 :
+        angle += 90
+        rotated = True
+
+    M = cv2.getRotationMatrix2D((cX, cY), angle, 1.0)
+    cos = np.abs(M[0, 0])
+    sin = np.abs(M[0, 1])
+    # compute the new bounding dimensions of the image
+    nW = int((h * sin) + (w * cos))
+    nH = int((h * cos) + (w * sin))
+    # adjust the rotation matrix to take into account translation
+    M[0, 2] += (nW / 2) - cX
+    M[1, 2] += (nH / 2) - cY
+    # perform the actual rotation and return the image
+    img_rot = cv2.warpAffine(img, M, (nW, nH))
+
+    r_w = h if rotated==False else w
+    r_h = w if rotated==False else h
+    img_crop = cv2.getRectSubPix(img_rot, (int(r_w * 0.9), int(r_h * 0.9)), (nW / 2, nH / 2))
+    if abs(rect[2]) < 3.0:
+        img_crop = cv2.getRectSubPix(img, (int(h), int(w)), (cX, cY))
+
+
+    if img_crop[:, :, 2].mean() > 170: #or angle == 0.0:
+        img_crop = img
+    return img_crop
+
+
+def align_mura_elbow(img):
+    imgray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+
+    blur = cv2.GaussianBlur(imgray,(5,5),0)
+    ret, thresh = cv2.threshold(blur, 0,255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+
+    contours, _ = cv2.findContours(thresh, cv2.RETR_TREE  ,cv2.CHAIN_APPROX_SIMPLE)
+
+    x = 750.0
+    removed_contour = []
+    for c in contours:
+        #print(cv2.contourArea(c))
+        if cv2.contourArea(c) > x:
+            #print(cv2.contourArea(c))
+            removed_contour.append(c)
+    if len(removed_contour) ==0:
+        removed_contour = contours
+    cnt = np.concatenate(removed_contour)
+    rotrect = cv2.minAreaRect(cnt)
+
+    #box = np.int0(cv2.boxPoints(rotrect))
+
+    # crop
+    img_croped = crop_minAreaRect(img, rotrect)
+    return img_croped
+
 
 class MURA_Dataset(object):
 
@@ -91,11 +155,12 @@ class MURA_Dataset(object):
 
         img_path = self.imgs[index]
         img = cv2.imread(img_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
+        #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img_croped = align_mura_elbow(img)
+        img_croped = cv2.cvtColor(img_croped, cv2.COLOR_BGR2GRAY)
         # contrast limit가 2이고 title의 size는 8X8
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        img2 = clahe.apply(img)
+        img2 = clahe.apply(img_croped)
 
         data = Image.fromarray(img2)
         #data = Image.open(img_path)
