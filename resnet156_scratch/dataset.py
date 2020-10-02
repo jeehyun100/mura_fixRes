@@ -42,17 +42,20 @@ def logo_filter(data, threshold=200):
     return im
 
 def crop_minAreaRect(img, rect):
-
     size = rect[1]
     angle = rect[2]
-    (h, w) = size[0], size[1]
+    (o_h, o_w) = size[0], size[1]
     (cX, cY) = rect[0]
+
     rotated = False
     angle = rect[2]
 
-    if (angle < -45 and (h > w)) or angle == -90 :
+    # if (angle < -45 and (h > w)) or angle == -90 :
+    if (angle < -45) or angle == -90:
         angle += 90
         rotated = True
+    w = o_h if rotated == False else o_w
+    h = o_w if rotated == False else o_h
 
     M = cv2.getRotationMatrix2D((cX, cY), angle, 1.0)
     cos = np.abs(M[0, 0])
@@ -65,17 +68,49 @@ def crop_minAreaRect(img, rect):
     M[1, 2] += (nH / 2) - cY
     # perform the actual rotation and return the image
     img_rot = cv2.warpAffine(img, M, (nW, nH))
-
-    r_w = h if rotated==False else w
-    r_h = w if rotated==False else h
-    img_crop = cv2.getRectSubPix(img_rot, (int(r_w * 0.9), int(r_h * 0.9)), (nW / 2, nH / 2))
+    img_crop = cv2.getRectSubPix(img_rot, (int(w * 0.9), int(h * 0.9)), (nW / 2, nH / 2))
+    
     if abs(rect[2]) < 3.0:
-        img_crop = cv2.getRectSubPix(img, (int(h), int(w)), (cX, cY))
+        img_crop = cv2.getRectSubPix(img, (int(w), int(h)), (cX, cY))
 
-
-    if img_crop[:, :, 2].mean() > 170: #or angle == 0.0:
+    if img_crop[:, :, 2].mean() > 170:  # or angle == 0.0:
         img_crop = img
+
     return img_crop
+    #
+    # size = rect[1]
+    # angle = rect[2]
+    # (h, w) = size[0], size[1]
+    # (cX, cY) = rect[0]
+    # rotated = False
+    # angle = rect[2]
+    #
+    # if (angle < -45 and (h > w)) or angle == -90 :
+    #     angle += 90
+    #     rotated = True
+    #
+    # M = cv2.getRotationMatrix2D((cX, cY), angle, 1.0)
+    # cos = np.abs(M[0, 0])
+    # sin = np.abs(M[0, 1])
+    # # compute the new bounding dimensions of the image
+    # nW = int((h * sin) + (w * cos))
+    # nH = int((h * cos) + (w * sin))
+    # # adjust the rotation matrix to take into account translation
+    # M[0, 2] += (nW / 2) - cX
+    # M[1, 2] += (nH / 2) - cY
+    # # perform the actual rotation and return the image
+    # img_rot = cv2.warpAffine(img, M, (nW, nH))
+    #
+    # r_w = h if rotated==False else w
+    # r_h = w if rotated==False else h
+    # img_crop = cv2.getRectSubPix(img_rot, (int(r_w * 0.9), int(r_h * 0.9)), (nW / 2, nH / 2))
+    # if abs(rect[2]) < 3.0:
+    #     img_crop = cv2.getRectSubPix(img, (int(h), int(w)), (cX, cY))
+    #
+    #
+    # if img_crop[:, :, 2].mean() > 170: #or angle == 0.0:
+    #     img_crop = img
+    # return img_crop
 
 
 def align_mura_elbow(img):
