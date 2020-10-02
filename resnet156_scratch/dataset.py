@@ -5,6 +5,8 @@ import torch as t
 from PIL import Image
 from torchvision import transforms as T
 import cv2
+from matplotlib import pyplot as plt
+import torchvision.transforms.functional as F
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -18,6 +20,14 @@ IMAGENET_STD = [0.229, 0.224, 0.225]
 MURA_MEAN = [0.22588661454502146] * 3
 MURA_STD = [0.17956269377916526] * 3
 
+#0.19927204
+#0.20271735
+
+# MURA_MEAN_CROP = [0.2770] * 3
+# MURA_STD_CROP = [0.1623] * 3
+
+MURA_MEAN_CROP = [0.19927204] * 3
+MURA_STD_CROP = [0.20271735] * 3
 
 def logo_filter(data, threshold=200):
 
@@ -95,6 +105,14 @@ def align_mura_elbow(img):
     img_croped = crop_minAreaRect(img, rotrect)
     return img_croped
 
+class SquarePad:
+	def __call__(self, image):
+		w, h = image.size
+		max_wh = np.max([w, h])
+		hp = int((max_wh - w) / 2)
+		vp = int((max_wh - h) / 2)
+		padding = (hp, vp, hp, vp)
+		return F.pad(image, padding, 0, 'constant')
 
 class MURA_Dataset(object):
 
@@ -122,30 +140,36 @@ class MURA_Dataset(object):
         self.train = train
         self.test = test
 
+        self.max_width = 0
+        self.max_height = 0
+
         if transforms is None:
 
             if self.train and not self.test:
                 # 这里的X光图是1 channel的灰度图
                 self.transforms = T.Compose([
                     # T.Lambda(logo_filter),
+                    SquarePad(),
                     T.Resize(320),
                     T.RandomCrop(320),
+                    #T.RandomResizedCrop(300),
                     T.RandomHorizontalFlip(),
                     T.RandomVerticalFlip(),
-                    T.RandomRotation(30),
+                    #T.RandomRotation(30),
                     T.ToTensor(),
                     T.Lambda(lambda x: t.cat([x[0].unsqueeze(0), x[0].unsqueeze(0), x[0].unsqueeze(0)], 0)),  # 转换成3 channel
-                    T.Normalize(mean=MURA_MEAN, std=MURA_STD),
+                    #T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                 ])
             if not self.train:
                 # 这里的X光图是1 channel的灰度图
                 self.transforms = T.Compose([
                     # T.Lambda(logo_filter),
+                    SquarePad(),
                     T.Resize(320),
                     T.CenterCrop(320),
                     T.ToTensor(),
                     T.Lambda(lambda x: t.cat([x[0].unsqueeze(0), x[0].unsqueeze(0), x[0].unsqueeze(0)], 0)),  # 转换成3 channel
-                    T.Normalize(mean=MURA_MEAN, std=MURA_STD),
+                    #T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                 ])
 
     def __getitem__(self, index):
@@ -155,11 +179,15 @@ class MURA_Dataset(object):
 
         img_path = self.imgs[index]
         img = cv2.imread(img_path)
-        #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img_croped = align_mura_elbow(img)
+
+        self.max_height = img.shape[0] if img.shape[0] > self.max_height else self.max_height
+        self.max_width = img.shape[1] if img.shape[1] > self.max_width else self.max_width
         img_croped = cv2.cvtColor(img_croped, cv2.COLOR_BGR2GRAY)
-        # contrast limit가 2이고 title의 size는 8X8
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        #contrast limit가 2이고 title의 size는 8X8
+        clahe = cv2.createCLAHE(clipLimit=1, tileGridSize=(4, 4))
         img2 = clahe.apply(img_croped)
 
         data = Image.fromarray(img2)
@@ -190,14 +218,62 @@ class MURA_Dataset(object):
 
     def __len__(self):
         return len(self.imgs)
+    def get_max_size(self):
+        return self.max_height, self.max_width
 
 
 if __name__ == "__main__":
-    from config.config import opt
+#    from config.config import opt
     from tqdm import tqdm
-    train_data = MURA_Dataset(opt.data_root, opt.train_image_paths, train=True)
-    l = [x[0] for x in tqdm(train_data)]
-    x = t.cat(l, 0)
-    print(x.mean())
-    print(x.std())
+    show_image_hist = False
+    train_data = MURA_Dataset('../', '../MURA-v1.1/train_image_paths.csv',part='XR_ELBOW', train=True)
+
+    if show_image_hist:
+        l = [(x[0].cpu().numpy(), x[2]) for x in tqdm(train_data)]
+    else:
+        l = np.array([x[0].cpu().numpy() for x in tqdm(train_data)])
+    #m = t.cat(l, 0)
+
+
+    fig, axes = plt.subplots(nrows=2, ncols=2)
+
+    if show_image_hist:
+        for data, file_path in l:
+
+
+            fig.suptitle(str(file_path))
+            np_array = data
+            np_array2 = np_array.transpose(2, 1, 0)
+            np_array2 = np.asarray(np_array2 * 255, dtype='uint8')
+            axes[0,0].imshow(np_array2)
+            hist_full = np.histogram(np_array2[:,:,0], bins=256, range=[0, 256])
+
+            count_f = hist_full[0]
+            bins = hist_full[1]
+            axes[0,1].bar(bins[:-1], count_f, color='r', alpha=0.5)
+
+            img_croped = cv2.cvtColor(np_array.transpose(2, 1, 0), cv2.COLOR_BGR2GRAY)
+            img_croped = np.asarray(img_croped * 255, dtype='uint8')
+
+            clahe = cv2.createCLAHE(clipLimit=1, tileGridSize=(4, 4))
+            img2 = clahe.apply(img_croped)
+            axes[1,0].imshow(img2, cmap='gray')
+            hist_full_ep = np.histogram(img2, bins=256, range=[0, 256])
+
+            count_f_eq = hist_full_ep[0]
+            bins_eq = hist_full_ep[1]
+            axes[1,1].bar(bins_eq[:-1], count_f_eq, color='r', alpha=0.5)
+
+            fig.show()
+            plt.pause(2)
+            plt.clf()
+            fig, axes = plt.subplots(nrows=2, ncols=2)
+    else:
+        print("none")
+        print(l.mean())
+        print(l.std())
+
+
+            # print(x.mean())
+            # print(x.std())
 
