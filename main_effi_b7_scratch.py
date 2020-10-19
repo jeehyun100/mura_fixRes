@@ -114,24 +114,21 @@ def show(input_sizes, learning_rate, epochs, batch, workers, shared_folder_path,
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Training script for ResNet50 FixRes",
+    parser = ArgumentParser(description="Training script for EfficienctNet B7 FixRes",
                             formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--learning-rate', default=0.0001, type=float, help='base learning rate')
+    parser.add_argument('--learning-rate', default=0.0001 , type=float, help='base learning rate')
     parser.add_argument('--input-size', default=320, type=int, help='images input size')
-    parser.add_argument('--epochs', default=10, type=int, help='epochs')
+    parser.add_argument('--epochs', default=70, type=int, help='epochs')
     parser.add_argument('--batch', default=6, type=int, help='Batch by GPU')
-    parser.add_argument('--gpu_node', default='0,1', type=str, help='GPU nodes')
-    parser.add_argument('--workers', default=4, type=int, help='Numbers of CPUs')
+    parser.add_argument('--gpu_node', default='0', type=str, help='GPU nodes')
+    parser.add_argument('--workers', default=1, type=int, help='Numbers of CPUs')
     parser.add_argument('--shared-folder-path', default='./shared_folder', type=str, help='Shared Folder')
-    parser.add_argument('--job-id', default='ef_b7_elbow', type=str, help='id of the execution')
+    parser.add_argument('--job-id', default='efi_elb_wnor_whist_pad_rot', type=str, help='id of the execution')
     parser.add_argument('--data_root', default='./', type=str, help='id of the execution')
-    parser.add_argument('--train_image_paths', default='MURA-v1.1/train_image_paths.csv', type=str,
-                        help='id of the execution')
-    parser.add_argument('--test_image_paths', default='MURA-v1.1/valid_image_paths.csv', type=str,
-                        help='id of the execution')
-    parser.add_argument('--mura_part', type=str, default="XR_ELBOW",
-                        help='type of mura dataset')  # #'ALL XR_ELBOW', 'XR_FINGER', 'XR_FOREARM', 'XR_HAND', 'XR_HUMERUS', 'XR_SHOULDER', 'XR_WRIST']
-    parser.add_argument('--load-epoch', type=str, default="20", help='# epoch')
+    parser.add_argument('--train_image_paths', default='MURA-v1.1/train_image_paths.csv', type=str, help='id of the execution')
+    parser.add_argument('--test_image_paths', default='MURA-v1.1/valid_image_paths.csv', type=str, help='id of the execution')
+    parser.add_argument('--mura_part',  type=str, default="XR_ELBOW", help='type of mura dataset')# #'ALL XR_ELBOW', 'XR_FINGER', 'XR_FOREARM', 'XR_HAND', 'XR_HUMERUS', 'XR_SHOULDER', 'XR_WRIST']
+    parser.add_argument('--load-epoch',  type=str, default="20", help='# epoch')
 
     args = parser.parse_args()
 
@@ -180,5 +177,5 @@ if __name__ == "__main__":
     #     , args.test_image_paths
     #     , args.mura_part
     #     , args.load_epoch)
-    #
+    # #
     #

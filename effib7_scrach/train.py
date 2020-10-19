@@ -226,6 +226,8 @@ class Trainer:
         max_accuracy=0.0
         # Start from the loaded epoch
         start_epoch = self._state.epoch
+        previous_loss = 1e10
+        lr = self._train_cfg.lr
         for epoch in range(start_epoch, self._train_cfg.epochs):
             print(f"Start epoch {epoch}", flush=True)
             self._state.model.train()
@@ -233,6 +235,8 @@ class Trainer:
             self._state.epoch = epoch
             running_loss = 0.0
             count=0
+            current_loss = 0.0
+
             total_step = len(self._train_loader)
             for i, data in enumerate(self._train_loader):
                 inputs, labels, _, body_part = data
@@ -253,6 +257,21 @@ class Trainer:
                     print('Epoch [{0}/{1}], Step [{2}/{3}], Loss: {4:.4f}'
                           .format(epoch + 1, self._train_cfg.epochs, i + 1, total_step, running_loss/print_freq))
                     running_loss = 0.0
+
+            # update learning rate
+            if current_loss / count > previous_loss:
+                # if val_loss > previous_loss:
+                lr = lr * 0.5
+                # lr = lr * opt.lr_decay
+                # 第二种降低学习率的方法:不会有moment等信息的丢失
+                for param_group in self._state.optimizer.param_groups:
+                    param_group['lr'] = lr  # self._train_cfg.lr
+                    print("loss decay {0} , decay factor{1}".format(lr, 0.5))
+
+            # previous_loss = val_loss
+            previous_loss = current_loss / count
+            current_loss = 0
+            count = 0
 
             if epoch%1 == 0 or epoch == 0:
                 print("Start evaluation of the model", flush=True)
@@ -286,7 +305,7 @@ class Trainer:
                 max_accuracy=np.max((max_accuracy, acc))
 
                 # Save for best accuracy models
-                if max_accuracy >= acc :
+                if  acc >= max_accuracy :
                     print("Epoch [{0}/{1}], Save Best Model[accuracy {0}]".format(epoch + 1, self._train_cfg.epochs, acc))
                     self.checkpoint(rm_init=False)
 
