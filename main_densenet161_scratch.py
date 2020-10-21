@@ -139,20 +139,7 @@ if __name__ == "__main__":
         os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1'
 
 
-    run(args.input_size
-        , args.learning_rate
-        , args.epochs
-        , args.batch
-        , args.workers
-        , args.shared_folder_path
-        , args.job_id
-        , args.data_root
-        , args.train_image_paths
-        , args.test_image_paths
-        , args.mura_part
-        , args.load_epoch)
-
-    # test(args.input_size
+    # run(args.input_size
     #     , args.learning_rate
     #     , args.epochs
     #     , args.batch
@@ -164,6 +151,19 @@ if __name__ == "__main__":
     #     , args.test_image_paths
     #     , args.mura_part
     #     , args.load_epoch)
+
+    test(args.input_size
+        , args.learning_rate
+        , args.epochs
+        , args.batch
+        , args.workers
+        , args.shared_folder_path
+        , args.job_id
+        , args.data_root
+        , args.train_image_paths
+        , args.test_image_paths
+        , args.mura_part
+        , args.load_epoch)
 
 
 

@@ -392,7 +392,7 @@ class Trainer:
             num_workers=(self._train_cfg.workers - 1),  # sampler=test_sampler, Attention je le met pas pour l instant
         )
 
-        for i, data in enumerate(self._test_loader):
+        for i, data in enumerate(self._train_loader):
             inputs, labels, file_path, body_part = data
 
             inputs = inputs.to(self.device)
@@ -402,5 +402,6 @@ class Trainer:
                 img_data = np.transpose(img_data, (1,2,0))
                 #img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
                 cv2.imshow("_".join([file_path[i].split('/')[4],file_path[i].split('/')[5],file_path[i].split('/')[6]]), img_data)
+                print("_".join([file_path[i].split('/')[4],file_path[i].split('/')[5],file_path[i].split('/')[6]]))
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()

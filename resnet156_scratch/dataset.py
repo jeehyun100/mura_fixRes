@@ -26,8 +26,8 @@ MURA_STD = [0.17956269377916526] * 3
 # MURA_MEAN_CROP = [0.2770] * 3
 # MURA_STD_CROP = [0.1623] * 3
 
-MURA_MEAN_CROP = [0.19927204] * 3
-MURA_STD_CROP = [0.20271735] * 3
+MURA_MEAN_CROP = [0.19427924] * 3
+MURA_STD_CROP = [0.19608901] * 3
 
 def logo_filter(data, threshold=200):
 
@@ -114,10 +114,15 @@ def crop_minAreaRect(img, rect):
 
 
 def align_mura_elbow(img):
-    imgray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    data = Image.fromarray(img)
+    img2 = logo_filter(data)
+    #opencvImage = cv2.cvtColor(numpy.array(pil_image), cv2.COLOR_RGB2BGR)
+    imgray = np.array(img2)
+
+    #qqqqqqqqqimgray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 
-    blur = cv2.GaussianBlur(imgray,(5,5),0)
+    blur = cv2.GaussianBlur(imgray,(7,7),4)
     ret, thresh = cv2.threshold(blur, 0,255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
     contours, _ = cv2.findContours(thresh, cv2.RETR_TREE  ,cv2.CHAIN_APPROX_SIMPLE)
@@ -193,7 +198,7 @@ class MURA_Dataset(object):
                     #T.RandomRotation(30),
                     T.ToTensor(),
                     T.Lambda(lambda x: t.cat([x[0].unsqueeze(0), x[0].unsqueeze(0), x[0].unsqueeze(0)], 0)),  # 转换成3 channel
-                    #T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+                    T.Normalize(mean=MURA_MEAN_CROP, std=MURA_STD_CROP),
                 ])
             if not self.train:
                 # 这里的X光图是1 channel的灰度图
@@ -204,7 +209,7 @@ class MURA_Dataset(object):
                     T.CenterCrop(320),
                     T.ToTensor(),
                     T.Lambda(lambda x: t.cat([x[0].unsqueeze(0), x[0].unsqueeze(0), x[0].unsqueeze(0)], 0)),  # 转换成3 channel
-                    #T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+                    T.Normalize(mean=MURA_MEAN_CROP, std=MURA_STD_CROP),
                 ])
 
     def __getitem__(self, index):
