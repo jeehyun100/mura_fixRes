@@ -23,7 +23,7 @@ from sklearn.metrics import cohen_kappa_score
 import csv
 from .dataset import MURA_Dataset
 import cv2
-from unet import UNet
+from .unet_model import UNet
 import logging
 
 

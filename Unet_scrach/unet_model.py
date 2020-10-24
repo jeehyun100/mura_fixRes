@@ -3,6 +3,7 @@
 import torch.nn.functional as F
 
 from .unet_parts import *
+import torch as t
 
 
 class UNet(nn.Module):
@@ -23,6 +24,45 @@ class UNet(nn.Module):
         self.up3 = Up(256, 128 // factor, bilinear)
         self.up4 = Up(128, 64, bilinear)
         self.outc = OutConv(64, n_classes)
+        #1,320,320
+        self.conv = nn.Sequential(
+            nn.Conv2d(1, 64, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.Conv2d(64, 64, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.MaxPool2d(2, 2),
+            # 64 160 160
+            nn.Conv2d(64, 128, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.Conv2d(128, 128, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.MaxPool2d(2, 2),
+            # 128 80 80
+            nn.Conv2d(128, 256, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.Conv2d(256, 256, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.Conv2d(256, 256, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.MaxPool2d(2, 2),
+            # 10,256,35,35
+            #313600
+            nn.Conv2d(256, 128, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.Conv2d(128, 128, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.Conv2d(128, 64, 3, padding=0), nn.LeakyReLU(0.2),
+            nn.MaxPool2d(2, 2),
+
+            # nn.Conv2d(256, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.Conv2d(512, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.Conv2d(512, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.MaxPool2d(2, 2),
+            # # 512 20 20
+            # nn.Conv2d(512, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.Conv2d(512, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.Conv2d(512, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.MaxPool2d(2, 2),
+            # #512 10 10
+            # nn.Conv2d(512, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.Conv2d(512, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.Conv2d(512, 512, 3, padding=1), nn.LeakyReLU(0.2),
+            # nn.MaxPool2d(2, 2)
+
+
+        )
+        self.classifier = nn.Linear(12544, 1)
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -34,5 +74,13 @@ class UNet(nn.Module):
         x = self.up2(x, x3)
         x = self.up3(x, x2)
         x = self.up4(x, x1)
-        logits = self.outc(x)
-        return logits
+        x = self.outc(x)
+        x = self.conv(x)
+        x = x.view(x.size()[0], -1)
+        #x = t.view(-1)
+        #x = x.view(x.size()[0], -1)
+        x = self.classifier(x)
+        x = t.sigmoid(x)
+        return x
+        #logits = self.outc(x)
+        #return logits
