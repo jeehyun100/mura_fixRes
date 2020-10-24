@@ -133,8 +133,8 @@ if __name__ == "__main__":
                         help='id of the execution')
     parser.add_argument('--mura_part', type=str, default="XR_FINGER",
                         help='type of mura dataset')  # #'ALL XR_ELBOW', 'XR_FINGER', 'XR_FOREARM', 'XR_HAND', 'XR_HUMERUS', 'XR_SHOULDER', 'XR_WRIST']
-    parser.add_argument('--load-epoch', type=str, default="59", help='# epoch')
-
+    parser.add_argument('--load-epoch', type=str, default="./unet_scrach/unet_carvana_scale1_epoch5.pth", help='# epoch')
+#unet_carvana_scale1_epoch5.pth
     args = parser.parse_args()
     if args.gpu_node == '0':
         os.environ["CUDA_VISIBLE_DEVICES"] = '0'
