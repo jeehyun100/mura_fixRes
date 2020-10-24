@@ -24,6 +24,7 @@ import csv
 from .dataset import MURA_Dataset
 import cv2
 from .unet_model import UNet
+from .unet_model2 import UNetFineTune
 import logging
 
 
@@ -44,6 +45,7 @@ class TrainerState:
     optimizer: optim.Optimizer
     lr_scheduler: torch.optim.lr_scheduler._LRScheduler
 
+
     def save(self, filename: str) -> None:
         data = attr.asdict(self)
         # store only the state dict
@@ -54,20 +56,29 @@ class TrainerState:
         torch.save(data, filename)
 
     @classmethod
-    def load(cls, filename: str, default: "TrainerState") -> "TrainerState":
-        data = torch.load(filename)
+    def load(cls, filename: str, default: "TrainerState", cfg) -> "TrainerState":
+        data = {}
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        data_u = torch.load(filename, map_location=device)
         # We need this default to load the state dict
+
         model = default.model
-        model.load_state_dict(data["model"])
+        model.load_state_dict(data_u)
         data["model"] = model
 
-        optimizer = default.optimizer
-        optimizer.load_state_dict(data["optimizer"])
-        data["optimizer"] = optimizer
+        if 'optimizer' not in data:
+            optimizer = optim.RMSprop(model.parameters(), lr=cfg.lr, weight_decay=1e-8, momentum=0.9)
+            lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if model.n_classes > 1 else 'max', patience=2)
 
-        lr_scheduler = default.lr_scheduler
-        lr_scheduler.load_state_dict(data["lr_scheduler"])
+        # optimizer = default.optimizer
+        # optimizer.load_state_dict(data["optimizer"])
+        data["optimizer"] = optimizer
+        #
+        # lr_scheduler = default.lr_scheduler
+        # lr_scheduler.load_state_dict(data["lr_scheduler"])
         data["lr_scheduler"] = lr_scheduler
+        data["epoch"] = 1
+        data["accuracy"] = 90
         return cls(**data)
 
 
@@ -146,7 +157,7 @@ class Trainer:
             num_workers=(self._train_cfg.workers - 1),  # sampler=test_sampler, Attention je le met pas pour l instant
         )
 
-
+        #model = torch.hub.load('milesial/Pytorch-UNet', 'unet_carvana')
         #model = models.densenet161(pretrained=True)
         model = UNet(n_channels=3, n_classes=1, bilinear=True)
         logging.info(f'Network:\n'
@@ -177,7 +188,7 @@ class Trainer:
         checkpoint_fn = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id), "checkpoint_{0}.pth".format(str(self._train_cfg.load_epoch)))
         if os.path.isfile(checkpoint_fn):
             print(f"Load existing checkpoint from {checkpoint_fn}", flush=True)
-            self._state = TrainerState.load(checkpoint_fn, default=self._state)
+            self._state = TrainerState.load(checkpoint_fn, default=self._state, cfg = self._train_cfg)
             print("model_load")
 
     def _init_state(self) -> None:
@@ -211,6 +222,8 @@ class Trainer:
         self._test_loader = torch.utils.data.DataLoader(
             test_set, batch_size=self._train_cfg.batch_per_gpu, shuffle=False, num_workers=(self._train_cfg.workers-1),#sampler=test_sampler, Attention je le met pas pour l instant
         )
+
+        #model = torch.hub.load('milesial/Pytorch-UNet', 'unet_carvana',pretrained=True, map_location=self.device)
         model = UNet(n_channels=3, n_classes=1, bilinear=True)
         logging.info(f'Network:\n'
                      f'\t{model.n_channels} input channels\n'
@@ -240,11 +253,32 @@ class Trainer:
             epoch=0,accuracy=0.0, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler
         )
 
-        checkpoint_fn = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id), "checkpoint.pth")
+        #checkpoint_fn = osp.join(self._train_cfg.save_folder, str(self._train_cfg.job_id), "checkpoint.pth")
+        checkpoint_fn = osp.join(self._train_cfg.load_epoch)
         if os.path.isfile(checkpoint_fn):
             print(f"Load existing checkpoint from {checkpoint_fn}", flush=True)
-            self._state = TrainerState.load(checkpoint_fn, default=self._state)
+            self._state = TrainerState.load(checkpoint_fn, default=self._state,cfg = self._train_cfg)
             print("model_load")
+            FINE_TUNE = True
+            if  FINE_TUNE:
+                for parameter in self._state.model.parameters():
+                    parameter.requires_grad = False
+
+            model_my = UNetFineTune(self._state.model)
+
+            self._state.model= model_my
+
+
+            # if not FINE_TUNE:
+            #     for parameter in inception.parameters():
+            #         parameter.requires_grad = False
+
+            # 새로운 fully-connected classifier layer 를 만들어줍니다. (requires_grad 는 True)
+            # in_features: 2048 -> in 으로 들어오는 feature의 갯수
+            # n_features = inception.fc.in_features
+            # inception.fc = nn.Linear(n_features, 2)
+
+
 
     def _train(self) -> Optional[float]:
 
